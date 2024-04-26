@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -e
+
+REPO_NAME="fast-arc-$(date +%s)"
+REPO_OWNER="$(gh api user --jq '.login')"
+
+gh repo create ${REPO_NAME} --private --template BagToad/fast-arc-template
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+gh secret set FAST_ARC_TOKEN -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "$(gh auth token)"
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+gh secret set CONTROLLER_NAMESPACE -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "arc-systems"
+gh secret set RUNNER_INSTALLATION_NAME -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "arc-runner-set"
+gh secret set RUNNER_NAMESPACE -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "arc-runners"
+gh secret set ARC_CONFIG_URL -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "https://github.com/${REPO_OWNER}/${REPO_NAME}"
+
+gh cs create --repo ${REPO_OWNER}/${REPO_NAME}
+
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+gh cs ssh --repo ${REPO_OWNER}/${REPO_NAME} "until minikube status &> /dev/null; do echo 'Waiting for minikube to start'; sleep 5; done; echo 'Minikube is running'; until kubectl get pods -A 2> /dev/null | grep listener &> /dev/null; do echo 'Waiting for listener to start...'; sleep 5; done; echo 'listener pod is ready! You can now use ARC.';"
