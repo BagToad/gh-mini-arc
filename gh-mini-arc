@@ -3,11 +3,63 @@ set -e
 
 REPO_NAME="fast-arc-$(date +%s)"
 REPO_OWNER="$(gh api user --jq '.login')"
+template_repo="BagToad/mini-arc-template"
 
-gh repo create ${REPO_NAME} --private --template BagToad/mini-arc-template
+while getopts ":s:t:h-:" opt; do
+  case ${opt} in
+    s)
+      grep -E '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$' <<< "${OPTARG}"  > /dev/null 2>&1 || { echo "Invalid scaleset name: ${OPTARG}"; exit 1; }
+      
+      if [ -z "${scalesets}" ]; then
+        scalesets="${OPTARG}"
+      else 
+        scalesets="${scalesets}:${OPTARG}"
+      fi
+
+      # echo "scalesets: ${scalesets}"
+      ;;
+    t)
+      template_rep=$OPTARG
+      ;;
+    h)
+      echo "Usage: $0 [options]"
+      echo "  -s, --scalesets <scalesets>  The scalesets to create secrets for"
+      echo "  -t, --template <template>  The template repo to use"
+      exit 0
+      ;;
+    -)
+      case "${OPTARG}" in
+        long-option)
+          long_option="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
+          ;;
+        *)
+          echo "Invalid option: --${OPTARG}" >&2
+          exit 1
+          ;;
+      esac;;
+    \?)
+      echo "Invalid option: -${OPTARG}" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -${OPTARG} requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "${scalesets}" ]; then
+  echo "No scalesets provided, defaulting to arc-runner-set"
+  scalesets="arc-runner-set"
+  exit 1
+fi
+
+gh repo create ${REPO_NAME} --private --template ${template_repo} --clone
 if [ $? -ne 0 ]; then
   exit 1
 fi
+
+cd ${REPO_NAME}
 
 gh secret set FAST_ARC_TOKEN -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "$(gh auth token)"
 if [ $? -ne 0 ]; then
@@ -15,9 +67,67 @@ if [ $? -ne 0 ]; then
 fi
 
 gh secret set CONTROLLER_NAMESPACE -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "arc-systems"
-gh secret set RUNNER_INSTALLATION_NAME -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "arc-runner-set"
-gh secret set RUNNER_NAMESPACE -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "arc-runners"
 gh secret set ARC_CONFIG_URL -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "https://github.com/${REPO_OWNER}/${REPO_NAME}"
+
+# For each scale set, post the scale set secrets to the codespace and write the installation commands to the devcontainer.json.
+# These are unique secrets. There will be as many secrets as there are scalesets. 
+
+DEVCONTAINER=".devcontainer/devcontainer.json"
+START_ARC=".devcontainer/start-arc.sh"
+
+echo '{
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+  },
+  "postStartCommand": "/workspaces/$RepositoryName/.devcontainer/start-arc.sh"
+}' > ${DEVCONTAINER}
+
+echo '#!/bin/bash
+
+until docker info;
+  do sleep 1;
+done;
+
+minikube start
+
+helm install arc \
+    --namespace "${CONTROLLER_NAMESPACE}" \
+    --create-namespace \
+    oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
+
+' > ${START_ARC}
+
+count=0
+IFS=':' read -ra scaleset <<< "${scalesets}"
+# Loop through the array
+for i in "${scaleset[@]}"; do
+    # process each item
+    echo "Creating secrets for scaleset: ${i}"
+    RUNNER_INSTALLATION_NAME="${i}"
+    RUNNER_NAMESPACE="${i}-ns"
+
+    echo "setting secret name RUNNER_INSTALLATION_NAME_${count} to ${RUNNER_INSTALLATION_NAME}"
+    echo "setting secret name RUNNER_NAMESPACE_${count} to ${RUNNER_NAMESPACE}"
+    gh secret set RUNNER_INSTALLATION_NAME_${count} -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "${RUNNER_INSTALLATION_NAME}"
+    gh secret set RUNNER_NAMESPACE_${count} -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "${RUNNER_NAMESPACE}"
+
+    echo -E "
+helm install \"\${RUNNER_INSTALLATION_NAME_${count}}\" \\
+  --namespace \"\${RUNNER_NAMESPACE_${count}}\" \\
+  --create-namespace \\
+  --set githubConfigUrl=\"\${ARC_CONFIG_URL}\" \\
+  --set githubConfigSecret.github_token=\"\${FAST_ARC_TOKEN}\" \\
+  --set maxRunners=\"2\" \\
+  --set minRunners=\"1\" \\
+  oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set
+" >> ${START_ARC}
+
+    count=$(expr $count + 1)
+done
+
+git add ${DEVCONTAINER} ${START_ARC}
+git commit -m "MINI ARC: Add devcontainer and start-arc.sh"
+git push origin main
 
 gh cs create --repo ${REPO_OWNER}/${REPO_NAME}
 
