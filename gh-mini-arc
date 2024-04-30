@@ -4,7 +4,7 @@ set -e
 REPO_NAME="fast-arc-$(date +%s)"
 REPO_OWNER="$(gh api user --jq '.login')"
 
-gh repo create ${REPO_NAME} --private --template BagToad/fast-arc-template
+gh repo create ${REPO_NAME} --private --template BagToad/mini-arc-template
 if [ $? -ne 0 ]; then
   exit 1
 fi
