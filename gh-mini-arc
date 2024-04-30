@@ -51,7 +51,6 @@ done
 if [ -z "${scalesets}" ]; then
   echo "No scalesets provided, defaulting to arc-runner-set"
   scalesets="arc-runner-set"
-  exit 1
 fi
 
 gh repo create ${REPO_NAME} --private --template ${template_repo} --clone
