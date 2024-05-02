@@ -135,7 +135,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo -e "\nMinikube and ARC are starting in the codespace. This may take a few minutes."
-echo -n "Do you want to connect to the codespace now? (y/n): "
+echo -n "Do you want to run \`gh cs code --repo ${REPO_OWNER}/${REPO_NAME}\` to connect to the codespace now? (y/n): "
 read answer
 if [ "$answer" != "${answer#[Yy]}" ] ;then
   gh cs code --repo ${REPO_OWNER}/${REPO_NAME}
