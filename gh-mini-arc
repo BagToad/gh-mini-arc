@@ -134,4 +134,9 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-gh cs ssh --repo ${REPO_OWNER}/${REPO_NAME} "until minikube status &> /dev/null; do echo 'Waiting for minikube to start'; sleep 5; done; echo 'Minikube is running'; until kubectl get pods -A 2> /dev/null | grep listener &> /dev/null; do echo 'Waiting for listener to start...'; sleep 5; done; echo 'listener pod is ready! You can now use ARC.';"
+echo -e "\nMinikube and ARC are starting in the codespace. This may take a few minutes."
+echo -n "Do you want to connect to the codespace now? (y/n): "
+read answer
+if [ "$answer" != "${answer#[Yy]}" ] ;then
+  gh cs code --repo ${REPO_OWNER}/${REPO_NAME}
+fi
