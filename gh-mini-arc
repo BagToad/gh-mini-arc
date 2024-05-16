@@ -2,7 +2,7 @@
 set -e
 
 REPO_OWNER="$(gh api user --jq '.login')"
-template_repo="BagToad/mini-arc-template"
+TEMPLATE_REPO="BagToad/mini-arc-template"
 REPO_NAME="fast-arc-$(date +%s)"
 
 while getopts ":s:t:n:h" opt; do
@@ -19,7 +19,7 @@ while getopts ":s:t:n:h" opt; do
             # echo "scalesets: ${scalesets}"
             ;;
         t)
-            template_repo=$OPTARG
+            TEMPLATE_REPO=$OPTARG
             ;;
         n)
             REPO_NAME=$OPTARG
@@ -47,7 +47,7 @@ if [ -z "${scalesets}" ]; then
   scalesets="arc-runner-set"
 fi
 
-gh repo create ${REPO_NAME} --private --template ${template_repo} --clone
+gh repo create ${REPO_NAME} --private --template ${TEMPLATE_REPO} --clone
 if [ $? -ne 0 ]; then
   exit 1
 fi
