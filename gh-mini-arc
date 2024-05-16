@@ -15,8 +15,6 @@ while getopts ":s:t:n:h" opt; do
             else 
                 scalesets="${scalesets}:${OPTARG}"
             fi
-
-            # echo "scalesets: ${scalesets}"
             ;;
         t)
             TEMPLATE_REPO=$OPTARG
