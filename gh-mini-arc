@@ -26,7 +26,7 @@ while getopts ":s:t:n:h-:" opt; do
       ;;
     h)
       echo "Usage: $0 [options]"
-      echo "  -s, --scalesets <scalesets>  The scalesets to create secrets for"
+      echo "  -s, --scaleset <scaleset>  The scalesets to create secrets for"
       echo "  -t, --template <template>  The template repo to use"
       echo "  -n, --name <name>  The name for the new repository"
       exit 0
