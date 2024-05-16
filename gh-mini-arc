@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-REPO_NAME="fast-arc-$(date +%s)"
 REPO_OWNER="$(gh api user --jq '.login')"
 template_repo="BagToad/mini-arc-template"
+REPO_NAME="fast-arc-$(date +%s)"
 
-while getopts ":s:t:h-:" opt; do
+while getopts ":s:t:n:h-:" opt; do
   case ${opt} in
     s)
       grep -E '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$' <<< "${OPTARG}"  > /dev/null 2>&1 || { echo "Invalid scaleset name: ${OPTARG}"; exit 1; }
@@ -19,12 +19,16 @@ while getopts ":s:t:h-:" opt; do
       # echo "scalesets: ${scalesets}"
       ;;
     t)
-      template_rep=$OPTARG
+      template_repo=$OPTARG
+      ;;
+    n)
+      REPO_NAME=$OPTARG
       ;;
     h)
       echo "Usage: $0 [options]"
       echo "  -s, --scalesets <scalesets>  The scalesets to create secrets for"
       echo "  -t, --template <template>  The template repo to use"
+      echo "  -n, --name <name>  The name for the new repository"
       exit 0
       ;;
     -)
