@@ -1,51 +1,43 @@
 #!/usr/bin/env bash
 set -e
 
-REPO_NAME="fast-arc-$(date +%s)"
 REPO_OWNER="$(gh api user --jq '.login')"
-template_repo="BagToad/mini-arc-template"
+TEMPLATE_REPO="BagToad/mini-arc-template"
+REPO_NAME="fast-arc-$(date +%s)"
 
-while getopts ":s:t:h-:" opt; do
-  case ${opt} in
-    s)
-      grep -E '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$' <<< "${OPTARG}"  > /dev/null 2>&1 || { echo "Invalid scaleset name: ${OPTARG}"; exit 1; }
-      
-      if [ -z "${scalesets}" ]; then
-        scalesets="${OPTARG}"
-      else 
-        scalesets="${scalesets}:${OPTARG}"
-      fi
-
-      # echo "scalesets: ${scalesets}"
-      ;;
-    t)
-      template_rep=$OPTARG
-      ;;
-    h)
-      echo "Usage: $0 [options]"
-      echo "  -s, --scalesets <scalesets>  The scalesets to create secrets for"
-      echo "  -t, --template <template>  The template repo to use"
-      exit 0
-      ;;
-    -)
-      case "${OPTARG}" in
-        long-option)
-          long_option="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
-          ;;
-        *)
-          echo "Invalid option: --${OPTARG}" >&2
-          exit 1
-          ;;
-      esac;;
-    \?)
-      echo "Invalid option: -${OPTARG}" >&2
-      exit 1
-      ;;
-    :)
-      echo "Option -${OPTARG} requires an argument." >&2
-      exit 1
-      ;;
-  esac
+while getopts ":s:t:n:h" opt; do
+    case ${opt} in
+        s)
+            grep -E '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$' <<< "${OPTARG}"  > /dev/null 2>&1 || { echo "Invalid scaleset name: ${OPTARG}"; exit 1; }
+            
+            if [ -z "${scalesets}" ]; then
+                scalesets="${OPTARG}"
+            else 
+                scalesets="${scalesets}:${OPTARG}"
+            fi
+            ;;
+        t)
+            TEMPLATE_REPO="$(echo $OPTARG | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-' | cut -c 1-100)"
+            ;;
+        n)
+            REPO_NAME="$(echo $OPTARG | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-' | cut -c 1-100)"
+            ;;
+        h)
+            echo "Usage: $0 [options]"
+            echo "  -s <scaleset>  The scalesets to create secrets for"
+            echo "  -t <template>  The template repo to use"
+            echo "  -n <name>  The name for the new repository"
+            exit 0
+            ;;
+        \?)
+            echo "Invalid option: -${OPTARG}" >&2
+            exit 1
+            ;;
+        :)
+            echo "Option -${OPTARG} requires an argument." >&2
+            exit 1
+            ;;
+    esac
 done
 
 if [ -z "${scalesets}" ]; then
@@ -53,12 +45,12 @@ if [ -z "${scalesets}" ]; then
   scalesets="arc-runner-set"
 fi
 
-gh repo create ${REPO_NAME} --private --template ${template_repo} --clone
+gh repo create "${REPO_NAME}" --private --template ${TEMPLATE_REPO} --clone
 if [ $? -ne 0 ]; then
   exit 1
 fi
 
-cd ${REPO_NAME}
+cd "${REPO_NAME}"
 
 gh secret set FAST_ARC_TOKEN -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "$(gh auth token)"
 if [ $? -ne 0 ]; then
