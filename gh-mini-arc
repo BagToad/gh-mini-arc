@@ -64,16 +64,8 @@ gh secret set ARC_CONFIG_URL -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --b
 # These are unique secrets. There will be as many secrets as there are scalesets. 
 
 DEVCONTAINER=".devcontainer/devcontainer.json"
-START_ARC=".devcontainer/start-arc.sh"
 
-echo '{
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
-  "features": {
-  },
-  "postStartCommand": "/workspaces/$RepositoryName/.devcontainer/start-arc.sh"
-}' > ${DEVCONTAINER}
-
-echo '#!/bin/bash
+start_arc_script='#!/bin/bash
 
 until docker info;
   do sleep 1;
@@ -86,7 +78,7 @@ helm install arc \
     --create-namespace \
     oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
 
-' > ${START_ARC}
+'
 
 count=0
 IFS=':' read -ra scaleset <<< "${scalesets}"
@@ -102,25 +94,32 @@ for i in "${scaleset[@]}"; do
     gh secret set RUNNER_INSTALLATION_NAME_${count} -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "${RUNNER_INSTALLATION_NAME}"
     gh secret set RUNNER_NAMESPACE_${count} -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "${RUNNER_NAMESPACE}"
 
-    echo -E "
-helm install \"\${RUNNER_INSTALLATION_NAME_${count}}\" \\
-  --namespace \"\${RUNNER_NAMESPACE_${count}}\" \\
-  --create-namespace \\
-  --set githubConfigUrl=\"\${ARC_CONFIG_URL}\" \\
-  --set githubConfigSecret.github_token=\"\${FAST_ARC_TOKEN}\" \\
-  --set maxRunners=\"2\" \\
-  --set minRunners=\"1\" \\
-  oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set
-" >> ${START_ARC}
+    start_arc_script+=$(cat <<EOF
 
+helm install "\${RUNNER_INSTALLATION_NAME_${count}}" \\
+  --namespace "\${RUNNER_NAMESPACE_${count}}" \\
+  --create-namespace \\
+  --set githubConfigUrl="\${ARC_CONFIG_URL}" \\
+  --set githubConfigSecret.github_token="\${FAST_ARC_TOKEN}" \\
+  --set maxRunners="2" \\
+  --set minRunners="1" \\
+  oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set
+EOF
+)
     count=$(expr $count + 1)
 done
 
-git add ${DEVCONTAINER} ${START_ARC}
-git commit -m "MINI ARC: Add devcontainer and start-arc.sh"
-git push origin main
+# JSON escape the start-arc.sh script using jq
+json_escaped_start_arc_script=$(echo "${start_arc_script}" | jq -aRs .)
 
-gh cs create --repo ${REPO_OWNER}/${REPO_NAME}
+echo "{
+  \"image\": \"mcr.microsoft.com/devcontainers/universal:2\",
+  \"features\": {
+  },
+  \"postStartCommand\": ${json_escaped_start_arc_script}
+}" > ${DEVCONTAINER}
+
+gh cs create --repo ${REPO_OWNER}/${REPO_NAME} --devcontainer-content "$(cat ${DEVCONTAINER})"
 
 if [ $? -ne 0 ]; then
   exit 1
