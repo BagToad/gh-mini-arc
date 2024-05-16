@@ -17,10 +17,10 @@ while getopts ":s:t:n:h" opt; do
             fi
             ;;
         t)
-            TEMPLATE_REPO=$OPTARG
+            TEMPLATE_REPO="$(echo $OPTARG | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-' | cut -c 1-100)"
             ;;
         n)
-            REPO_NAME=$OPTARG
+            REPO_NAME="$(echo $OPTARG | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-' | cut -c 1-100)"
             ;;
         h)
             echo "Usage: $0 [options]"
@@ -45,12 +45,12 @@ if [ -z "${scalesets}" ]; then
   scalesets="arc-runner-set"
 fi
 
-gh repo create ${REPO_NAME} --private --template ${TEMPLATE_REPO} --clone
+gh repo create "${REPO_NAME}" --private --template ${TEMPLATE_REPO} --clone
 if [ $? -ne 0 ]; then
   exit 1
 fi
 
-cd ${REPO_NAME}
+cd "${REPO_NAME}"
 
 gh secret set FAST_ARC_TOKEN -a codespaces --repo ${REPO_OWNER}/${REPO_NAME} --body "$(gh auth token)"
 if [ $? -ne 0 ]; then
